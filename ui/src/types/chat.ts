@@ -4,6 +4,16 @@ export interface Product {
   imageUrl: string;
   description: string;
   link?: string;
+  shop: string;
+}
+
+export interface SocialMediaPost {
+  id: string;
+  username: string;
+  userAvatar: string;
+  imageUrl: string;
+  caption: string;
+  link: string;
 }
 
 export interface Message {
@@ -13,4 +23,5 @@ export interface Message {
   timestamp: Date;
   images?: string[];
   products?: Product[];
+  posts?: SocialMediaPost[];
 } 
