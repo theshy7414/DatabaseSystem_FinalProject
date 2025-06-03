@@ -3,6 +3,7 @@ import type { Message, Product, SocialMediaPost } from "@/types/chat";
 import { Card } from "@/components/ui/card";
 import { User, Bot, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEMO_MODE } from "@/config/chat";
 
 interface ChatMessageProps {
   message: Message;
@@ -30,8 +31,8 @@ function ProductCard({ product, showActions = true, onMatchThis, onSimilarItems 
           </div>
           <p className="text-sm text-gray-600">{product.description}</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="font-medium text-blue-600">{product.price}</p>
-            {product.link && (
+            <p className="font-medium text-blue-600">NT. {product.price}</p>
+            {!DEMO_MODE && product.link && (
               <a
                 href={product.link}
                 target="_blank"
@@ -42,7 +43,7 @@ function ProductCard({ product, showActions = true, onMatchThis, onSimilarItems 
               </a>
             )}
           </div>
-          {showActions && onMatchThis && onSimilarItems && (
+          {!DEMO_MODE && showActions && onMatchThis && onSimilarItems && (
             <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
               <Button
                 variant="outline"
@@ -154,7 +155,7 @@ export function ChatMessage({ message, onMoreProducts, onMorePosts, onSendMessag
             )}>{isUser ? message.content : (productIndex > 0 ? parts[0] : message.content)}</p>
           </div>
 
-          {/* User uploaded images */}
+          {/* User uploaded images - show in both normal and demo mode */}
           {message.images && message.images.length > 0 && (
             <div className={cn(
               "mt-4",
@@ -176,7 +177,7 @@ export function ChatMessage({ message, onMoreProducts, onMorePosts, onSendMessag
                   <ProductCard 
                     key={index} 
                     product={product}
-                    showActions={!isUser}
+                    showActions={!isUser && !DEMO_MODE}
                     onMatchThis={!isUser ? handleMatchThis : undefined}
                     onSimilarItems={!isUser ? handleSimilarItems : undefined}
                   />
@@ -195,7 +196,7 @@ export function ChatMessage({ message, onMoreProducts, onMorePosts, onSendMessag
           )}
 
           {/* Text between products and posts */}
-          {!isUser && postIndex > productIndex + 1 && (
+          {!DEMO_MODE && !isUser && postIndex > productIndex + 1 && (
             <div className="prose prose-sm max-w-none my-4">
               <p className={cn(
                 isUser ? "text-white" : "text-gray-900"
@@ -203,15 +204,15 @@ export function ChatMessage({ message, onMoreProducts, onMorePosts, onSendMessag
             </div>
           )}
 
-          {/* Posts section */}
-          {!isUser && message.posts && message.posts.length > 0 && (
+          {/* Posts section - hidden in demo mode */}
+          {!DEMO_MODE && message.posts && message.posts.length > 0 && (
             <div className="mt-4">
               <div className="grid grid-cols-2 gap-4">
                 {message.posts.slice(0, 2).map((post) => (
                   <SocialMediaPostCard key={post.id} post={post} />
                 ))}
               </div>
-              {message.posts.length > 2 && onMorePosts && (
+              {!DEMO_MODE && message.posts.length > 2 && onMorePosts && (
                 <Button
                   variant="outline"
                   className="mt-4 bg-white text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 w-full"
@@ -224,7 +225,7 @@ export function ChatMessage({ message, onMoreProducts, onMorePosts, onSendMessag
           )}
 
           {/* Final text */}
-          {!isUser && parts.length > postIndex + 1 && (
+          {!DEMO_MODE && !isUser && parts.length > postIndex + 1 && (
             <div className="prose prose-sm max-w-none mt-4">
               <p className={cn(
                 isUser ? "text-white" : "text-gray-900"

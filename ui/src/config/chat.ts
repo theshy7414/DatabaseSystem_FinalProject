@@ -1,9 +1,12 @@
-export const CHAT_MODE: 'mock' | 'api' = 'mock';
+export const CHAT_MODE: 'mock' | 'api' = 'api';
+
+// Demo mode configuration
+export const DEMO_MODE = true;
 
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:3001', // Change this to your API URL
+  BASE_URL: 'http://localhost:5000', // Change this to your API URL
   ENDPOINTS: {
-    CHAT: '/api/chat',
+    SEARCH: '/api/search',
   }
 };
 

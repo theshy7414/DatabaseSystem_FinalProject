@@ -6,7 +6,7 @@ import { ChatMessage } from "@/components/chat/ChatMessage";
 import type { Message, Product, SocialMediaPost } from "@/types/chat";
 import { ImagePlus, Send, ArrowLeft, X, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CHAT_MODE, MOCK_DELAYS } from "@/config/chat";
+import { CHAT_MODE, MOCK_DELAYS, DEMO_MODE } from "@/config/chat";
 import { createMockBotMessage } from "@/mocks/chatResponses";
 import { sendChatMessage } from "@/services/chatService";
 import { toast } from "@/components/ui/use-toast";
@@ -67,7 +67,66 @@ export default function ChatPage() {
         botMessage = createMockBotMessage(userMessage);
       } else {
         // Use real API
-        botMessage = await sendChatMessage(userMessage);
+        const imageBase64 = userMessage.images?.[0] || "";
+        
+        // Validate image size if present
+        if (imageBase64) {
+          const sizeInBytes = Math.ceil((imageBase64.length * 3) / 4);
+          const sizeInMB = sizeInBytes / (1024 * 1024);
+          if (sizeInMB > 15) {  // Leave 1MB buffer from server's 16MB limit
+            throw new Error("Image size too large. Please use an image under 15MB.");
+          }
+        }
+
+        // First try health check
+        try {
+          console.log("Testing server connection...");
+          const healthCheck = await fetch('http://localhost:8000/api/health');
+          if (!healthCheck.ok) {
+            throw new Error('Server health check failed');
+          }
+          console.log("Server is healthy");
+        } catch (error) {
+          console.error("Health check failed:", error);
+          throw new Error('Cannot connect to server. Please ensure the server is running.');
+        }
+
+        const payload = {
+          query_text: userMessage.content || "",
+          image_base64: imageBase64
+        };
+        console.log("Sending request with payload length:", JSON.stringify(payload).length);
+
+        const response = await fetch('http://localhost:8000/api/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Server error');
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        botMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: data.text,
+          timestamp: new Date(),
+          products: data.products?.map((p: any) => ({
+            ...p,
+            shop: p.brand,  // Map brand to shop for frontend display
+            link: null  // Add any product link if available
+          }))
+        };
       }
 
       setMessages(prev => [...prev, botMessage]);
@@ -77,7 +136,7 @@ export default function ChatPage() {
       console.error('Error getting bot response:', error);
       toast({
         title: "Error",
-        description: "Failed to get response from the assistant. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get response from the assistant. Please try again.",
         variant: "destructive"
       });
       setIsLoading(false);
@@ -153,7 +212,7 @@ export default function ChatPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Fashion Assistant</h1>
+          <h1 className="text-xl font-semibold text-gray-900">穿搭助理</h1>
         </div>
 
         {/* Main chat container */}
@@ -163,10 +222,10 @@ export default function ChatPage() {
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-16 px-4">
                   <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                    Welcome to Fashion Assistant
+                    我是穿搭助理
                   </h2>
                   <p className="text-gray-600 text-center mb-8 max-w-md">
-                    Upload images of your style or items you're interested in, and I'll help you with fashion recommendations.
+                    上傳你想搭配的衣服，輸入條件，我會幫你找到適合的商品。
                   </p>
                 </div>
               ) : (
@@ -246,7 +305,7 @@ export default function ChatPage() {
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message..."
+                  placeholder="幫我找500元以下的上衣..."
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                   className="pr-12 py-6 text-base border-gray-300 focus:border-blue-500 shadow-sm"
                 />
@@ -300,8 +359,8 @@ export default function ChatPage() {
                         </div>
                         <p className="text-sm text-gray-600">{product.description}</p>
                         <div className="flex items-center justify-between mt-2">
-                          <p className="font-medium text-blue-600">{product.price}</p>
-                          {product.link && (
+                          <p className="font-medium text-blue-600">NT. {product.price}</p>
+                          {!DEMO_MODE && product.link && (
                             <a
                               href={product.link}
                               target="_blank"
@@ -312,24 +371,26 @@ export default function ChatPage() {
                             </a>
                           )}
                         </div>
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 text-sm"
-                            onClick={() => handleMatchThis(product)}
-                          >
-                            Match This
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 text-sm"
-                            onClick={() => handleSimilarItems(product)}
-                          >
-                            Similar Items
-                          </Button>
-                        </div>
+                        {!DEMO_MODE && (
+                          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 text-sm"
+                              onClick={() => handleMatchThis(product)}
+                            >
+                              Match This
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 text-sm"
+                              onClick={() => handleSimilarItems(product)}
+                            >
+                              Similar Items
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
