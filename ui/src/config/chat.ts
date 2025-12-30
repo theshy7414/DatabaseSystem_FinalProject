@@ -4,7 +4,7 @@ export const CHAT_MODE: 'mock' | 'api' = 'api';
 export const DEMO_MODE = true;
 
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:5000', // Change this to your API URL
+  BASE_URL: 'http://localhost:8000', // Updated to match server.py port
   ENDPOINTS: {
     SEARCH: '/api/search',
   }

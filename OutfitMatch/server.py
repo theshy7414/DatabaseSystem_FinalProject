@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from query.query import user_query, close_db
+from query.query_neo4j import user_query, close_neo4j
 import traceback
 import logging
 import sys
 import datetime
 import socket
+from config.settings import SERVER_PORT
 
 # Force immediate output flush
 sys.stdout.reconfigure(line_buffering=True)
@@ -21,13 +22,13 @@ def check_port_available(port):
     except:
         return False
 
-# Try different ports if 8000 is not available
-PORT = 8000
-while not check_port_available(PORT) and PORT < 8010:
+# Try different ports if configured port is not available
+PORT = SERVER_PORT
+while not check_port_available(PORT) and PORT < SERVER_PORT + 10:
     print(f"Port {PORT} is in use, trying next port...")
     PORT += 1
 
-if PORT >= 8010:
+if PORT >= SERVER_PORT + 10:
     print("Could not find an available port!")
     sys.exit(1)
 
@@ -123,7 +124,7 @@ def search():
         logger.debug("user_query function returned successfully")
 
         # Convert products to list of dicts for JSON serialization
-        if result['products']:
+        if result.get('products'):
             products_list = []
             for product in result['products']:
                 products_list.append({
@@ -133,7 +134,7 @@ def search():
                     'category': product[3],
                     'brand': product[4],
                     'price': str(product[5]) if product[5] is not None else "N/A",
-                    'predicted_style': product[6],
+                    'predicted_style': product[6] if len(product) > 6 else [],
                     'imageUrl': product[7] if len(product) > 7 and product[7] else None,
                     'shop': product[4],
                     'link': None
@@ -152,8 +153,8 @@ def search():
             'message': str(e)
         }), 500
     finally:
-        logger.debug("Closing database connection")
-        close_db()
+        logger.debug("Request completed")
+        # Note: Don't close Neo4j connection here - using connection pool
 
 @app.route('/api/test', methods=['POST'])
 def test():
