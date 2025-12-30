@@ -186,14 +186,28 @@ def import_to_neo4j(df: pd.DataFrame):
                     valid_styles = ['休閒']
                 
                 # 準備商品資料
+                # 清理價格字串（移除 "NT. " 等前綴）
+                def clean_price(price_str):
+                    if pd.isna(price_str):
+                        return 0.0
+                    price_str = str(price_str).strip()
+                    # 移除常見的前綴
+                    price_str = price_str.replace('NT.', '').replace('NT', '').replace('$', '').strip()
+                    # 移除逗號
+                    price_str = price_str.replace(',', '')
+                    try:
+                        return float(price_str)
+                    except ValueError:
+                        return 0.0
+                
                 product_data = {
                     'id': f"prod_{idx}",  # 生成唯一 ID
                     'name': str(row['name']),
                     'description': str(row['description']),
                     'category': str(row.get('category', '其他')),
                     'brand': str(row.get('brand', '未知品牌')),
-                    'price': float(row['price']) if pd.notna(row['price']) else 0.0,
-                    'original_price': float(row.get('original_price', row['price'])) if pd.notna(row.get('original_price', row['price'])) else 0.0,
+                    'price': clean_price(row['price']),
+                    'original_price': clean_price(row.get('original_price', row['price'])),
                     'image_url': str(row.get('image_url', ''))
                 }
                 
