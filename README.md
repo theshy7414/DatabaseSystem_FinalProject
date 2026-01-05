@@ -32,20 +32,39 @@
 
 ## 快速開始
 
-### 1. 環境設置
+### 前置需求
+- Python 3.8+
+- Node.js 16+
+- Neo4j 5.0+（需要支援向量索引）
+- OpenAI API Key
+- Instagram 帳號（用於抓取穿搭貼文，可選）
 
+### 步驟 1：設置 Neo4j
+
+**選項 A：使用 Neo4j Desktop（推薦）**
+1. 下載並安裝 [Neo4j Desktop](https://neo4j.com/download/)
+2. 創建新的資料庫專案
+3. 設置密碼（記住這個密碼）
+4. 啟動資料庫
+
+**選項 B：使用 Docker**
 ```bash
-# 複製環境變數範本
-cd OutfitMatch
-cp .env.example .env
-
-# 編輯 .env 填入你的憑證
-# 必填：OPENAI_API_KEY, NEO4J_PASSWORD, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD
+docker run --name neo4j-outfitmatch \
+    -p 7474:7474 -p 7687:7687 \
+    -e NEO4J_AUTH=neo4j/your_password \
+    neo4j:latest
 ```
 
-`.env` 檔案範例：
+### 步驟 2：配置環境變數
+
+```bash
+cd OutfitMatch
+cp .env.example .env
+```
+
+編輯 `.env` 檔案：
 ```env
-# Instagram（用於抓取穿搭貼文）
+# Instagram（用於抓取穿搭貼文，可選）
 INSTAGRAM_USERNAME=your_username
 INSTAGRAM_PASSWORD=your_password
 
@@ -54,64 +73,61 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 
-# OpenAI
+# OpenAI（必填）
 OPENAI_API_KEY=sk-your-key
 
 # Server
 SERVER_PORT=8000
 ```
 
-### 2. 安裝依賴
+### 步驟 3：安裝依賴
 
 ```bash
 # 後端
 cd OutfitMatch
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Mac/Linux
-
+conda create -n outfitmatch python=3.10 -y
+conda activate outfitmatch
 pip install -r requirements.txt
 
 # 前端
-cd ..\ui
+cd ../ui
 npm install
 ```
 
-### 3. 初始化資料庫
+### 步驟 4：初始化資料庫
 
 ```bash
 # 回到 OutfitMatch 目錄
-cd ..\OutfitMatch
+cd ../OutfitMatch
 
 # 初始化 Neo4j schema（創建索引、約束、基礎資料）
 python database/init_neo4j_schema.py
 ```
 
-### 4. 載入資料
+### 步驟 5：載入資料
 
 ```bash
-# 載入商品資料（從 CSV 到 Neo4j）
-python loader/shop_neo4j.py --products_csv data/queenshop_all_products.csv
+# 載入商品資料（快速測試：只載入前 50 筆）
+python loader/shop_neo4j.py --nrows 50
 
-# 參數說明：
-# --nrows 100               # 只處理前 100 筆（測試用）
-# --skip_prediction         # 跳過 LLM 風格預測（使用已處理的 CSV）
+# 完整載入（需要較長時間）
+# python loader/shop_neo4j.py
 
-# 抓取 Instagram 穿搭貼文
-python loader/instagram_neo4j.py --max_posts 50
+# [可選] 抓取 Instagram 穿搭貼文
+python loader/instagram_neo4j.py --max_posts 20
 
-# 參數說明：
-# --max_posts 50            # 抓取 50 篇貼文（預設值）
+# [可選] 建立推薦關係
+python database/build_relationships.py
 ```
 
-### 5. 啟動服務
+### 步驟 6：啟動服務
 
 ```bash
 # 啟動後端 API 服務器（Port 8000）
 python server.py
 
 # 新開一個終端，啟動前端
-cd ..\ui
+cd ../ui
 npm run dev
 # 打開瀏覽器訪問 http://localhost:5173
 ```
@@ -151,25 +167,37 @@ npm run dev
 # 測試查詢引擎
 python query/query_neo4j.py
 
-# 檢查 Neo4j 資料
-# 在 Neo4j Browser (http://localhost:7474) 執行：
+# 檢查 Neo4j 資料（在 Neo4j Browser http://localhost:7474）
 MATCH (n) RETURN labels(n), count(n)  # 查看節點統計
 MATCH ()-[r]->() RETURN type(r), count(r)  # 查看關係統計
+
+# 查看推薦關係
+MATCH (p1:Product)-[r:GOES_WITH]->(p2:Product)
+RETURN p1.name, p2.name, r.score
+ORDER BY r.score DESC LIMIT 10
 ```
+
+詳細的架構設計和 Cypher 查詢範例請參閱 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 常見問題
 
-**Q: Port 8000 被占用？**
+**Q: Neo4j 連線失敗？**  
+A: 確認 Neo4j 服務已啟動，檢查 `.env` 中的連線資訊
+
+**Q: Port 8000 被占用？**  
 A: 修改 `.env` 中的 `SERVER_PORT`，並同步更新前端 `ui/src/config/chat.ts` 的 `BASE_URL`
 
-**Q: 圖片上傳失敗？**
-A: 檢查圖片大小是否超過 15MB，建議壓縮後上傳
-
-**Q: 找不到商品？**
+**Q: 找不到商品？**  
 A: 確保已執行 `python loader/shop_neo4j.py` 載入商品資料
 
-**Q: Neo4j 連線失敗？**
-A: 確認 Neo4j 服務已啟動，檢查 `.env` 中的連線資訊
+**Q: 圖片上傳失敗？**  
+A: 檢查圖片大小是否超過 15MB，建議壓縮後上傳
+
+**Q: OpenAI API 額度不足？**  
+A: 在 `.env` 設置 `STYLE_PREDICTION_MODEL=gpt-4o-mini` 使用更便宜的模型
+
+**Q: 向量索引錯誤？**  
+A: 確保使用 Neo4j 5.0+ 版本，向量索引需要較新版本支援
 
 ## 專案結構
 
